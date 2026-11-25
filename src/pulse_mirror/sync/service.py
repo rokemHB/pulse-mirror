@@ -29,7 +29,12 @@ _lock = threading.Lock()
 
 
 class SyncRefusedError(Exception):
-    """A sync is already running or the cooldown hasn't passed yet."""
+    """A sync is already running (``reason="running"``) or in cooldown (``"cooldown"``)."""
+
+    def __init__(self, reason: str, message: str, retry_at: datetime | None = None) -> None:
+        super().__init__(message)
+        self.reason = reason
+        self.retry_at = retry_at
 
 
 @dataclass
@@ -44,6 +49,19 @@ def _parse(ts: str) -> datetime:
     return datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
 
 
+def is_running() -> bool:
+    """True while a sync runs in this process."""
+    return _lock.locked()
+
+
+def cooldown_until(conn: sqlite3.Connection, now: datetime | None = None) -> datetime | None:
+    try:
+        check_allowed(conn, "manual", now)
+    except SyncRefusedError as e:
+        return e.retry_at
+    return None
+
+
 def check_allowed(conn: sqlite3.Connection, kind: str, now: datetime | None = None) -> None:
     """Raise :class:`SyncRefusedError` if another sync runs or (manual) cooldown is active.
 
@@ -56,7 +74,7 @@ def check_allowed(conn: sqlite3.Connection, kind: str, now: datetime | None = No
         (garmin.SOURCE,),
     ).fetchone()
     if row and now - _parse(row["started_at"]) < STALE_RUN:
-        raise SyncRefusedError("A sync is already running.")
+        raise SyncRefusedError("running", "A sync is already running.")
     if kind == "manual":
         last = conn.execute(
             """SELECT started_at FROM sync_runs WHERE source = ? AND kind != 'backfill'
@@ -65,9 +83,8 @@ def check_allowed(conn: sqlite3.Connection, kind: str, now: datetime | None = No
         ).fetchone()
         if last and now - _parse(last["started_at"]) < MANUAL_COOLDOWN:
             wait = MANUAL_COOLDOWN - (now - _parse(last["started_at"]))
-            raise SyncRefusedError(
-                f"Cooldown: try again in {int(wait.total_seconds() // 60) + 1} min."
-            )
+            minutes = int(wait.total_seconds() // 60) + 1
+            raise SyncRefusedError("cooldown", f"Cooldown: try again in {minutes} min.", now + wait)
 
 
 def sync_recent(
@@ -84,7 +101,7 @@ def sync_recent(
     as ``auth_required`` in the run log and shows up on the dashboard.
     """
     if not _lock.acquire(blocking=False):
-        raise SyncRefusedError("A sync is already running.")
+        raise SyncRefusedError("running", "A sync is already running.")
     try:
         check_allowed(conn, kind)
         run_id = repo.start_sync_run(conn, garmin.SOURCE, kind)
