@@ -1,0 +1,22 @@
+{
+  "userId": 1000001,
+  "mostRecentTrainingStatus": {
+    "userId": 1000001,
+    "latestTrainingStatusData": {
+      "1000003": {
+        "calendarDate": "2025-01-15",
+        "deviceId": 1000003,
+        "trainingStatus": 7,
+        "trainingStatusFeedbackPhrase": "PRODUCTIVE_1",
+        "primaryTrainingDevice": true,
+        "acuteTrainingLoadDTO": {
+          "acwrPercent": 52,
+          "acwrStatus": "OPTIMAL",
+          "dailyTrainingLoadAcute": 612,
+          "dailyTrainingLoadChronic": 538,
+          "dailyAcuteChronicWorkloadRatio": 1.1
+        }
+      }
+    }
+  }
+}

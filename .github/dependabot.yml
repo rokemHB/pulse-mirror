@@ -1,0 +1,14 @@
+version: 2
+updates:
+  # garminconnect is pinned on purpose: read its release notes before merging.
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      dev-tools:
+        dependency-type: development
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

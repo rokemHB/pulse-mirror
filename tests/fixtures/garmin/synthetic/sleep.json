@@ -1,0 +1,22 @@
+{
+  "dailySleepDTO": {
+    "id": 1000002,
+    "userProfilePK": 1000001,
+    "calendarDate": "2025-01-15",
+    "sleepTimeSeconds": 26460,
+    "napTimeSeconds": 0,
+    "sleepStartTimestampGMT": 1736898000000,
+    "sleepEndTimestampGMT": 1736925060000,
+    "deepSleepSeconds": 5100,
+    "lightSleepSeconds": 14460,
+    "remSleepSeconds": 6060,
+    "awakeSleepSeconds": 840,
+    "avgSleepStress": 14.5,
+    "sleepScores": {
+      "overall": {"value": 81, "qualifierKey": "GOOD"},
+      "totalDuration": {"value": 86, "qualifierKey": "GOOD"}
+    }
+  },
+  "restingHeartRate": 52,
+  "avgOvernightHrv": 58.0
+}

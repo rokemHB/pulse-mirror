@@ -1,0 +1,13 @@
+{
+  "userProfilePk": 1000001,
+  "hrvSummary": {
+    "calendarDate": "2025-01-15",
+    "weeklyAvg": 55,
+    "lastNightAvg": 58,
+    "lastNight5MinHigh": 79,
+    "baseline": {"lowUpper": 46, "balancedLow": 49, "balancedUpper": 63, "markerValue": 0.55},
+    "status": "BALANCED",
+    "feedbackPhrase": "HRV_BALANCED_2"
+  },
+  "hrvReadings": []
+}

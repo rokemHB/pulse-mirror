@@ -1,0 +1,21 @@
+{
+  "userProfileId": 1000001,
+  "calendarDate": "2025-01-15",
+  "totalSteps": 9120,
+  "totalDistanceMeters": 6950,
+  "restingHeartRate": 52,
+  "minHeartRate": 47,
+  "maxHeartRate": 151,
+  "averageStressLevel": 31,
+  "maxStressLevel": 92,
+  "stressDuration": 31200,
+  "restStressDuration": 27600,
+  "lowStressDuration": 18900,
+  "mediumStressDuration": 7800,
+  "highStressDuration": 1500,
+  "bodyBatteryChargedValue": 61,
+  "bodyBatteryDrainedValue": 55,
+  "bodyBatteryHighestValue": 88,
+  "bodyBatteryLowestValue": 24,
+  "privacyProtected": false
+}
