@@ -1,7 +1,8 @@
-"""In-process scheduler: the daily Garmin sync (and, later, weekly jobs).
+"""In-process scheduler: daily Garmin sync (+ morning email) and the weekly PDF report.
 
-Deliberately tiny (one daemon thread, no dependency). Catches up once after a
-restart if today's run was missed, and never runs more than once per day.
+Deliberately tiny (one daemon thread, no dependency). It ticks every minute and
+asks each job whether it is due, based on persistent state (the sync run log,
+the report files), so restarts catch up exactly once and nothing runs twice.
 """
 
 from __future__ import annotations
@@ -10,7 +11,8 @@ import logging
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
+from typing import Protocol
 
 from pulse_mirror.config import Settings
 from pulse_mirror.db import connect
@@ -21,6 +23,7 @@ from pulse_mirror.sync import service as sync
 log = logging.getLogger(__name__)
 
 AfterSyncHook = Callable[[sync.SyncResult], None]
+TICK_S = 60
 
 
 def parse_hhmm(value: str) -> time:
@@ -33,12 +36,20 @@ def next_run(now: datetime, at: time) -> datetime:
     return candidate if candidate > now else candidate + timedelta(days=1)
 
 
-def missed_today(now: datetime, at: time, last_scheduled_start: datetime | None) -> bool:
-    """True if today's slot has passed and no scheduled run started since then."""
+def missed_today(now: datetime, at: time, last_start: datetime | None) -> bool:
+    """True if today's slot has passed and no run started since then."""
     slot = now.replace(hour=at.hour, minute=at.minute, second=0, microsecond=0)
     if now < slot:
         return False
-    return last_scheduled_start is None or last_scheduled_start < slot
+    return last_start is None or last_start < slot
+
+
+class Job(Protocol):
+    name: str
+
+    def due(self, now: datetime) -> bool: ...
+
+    def run(self) -> object: ...
 
 
 @dataclass
@@ -46,7 +57,7 @@ class DailySync:
     settings: Settings
     garmin_factory: Callable[[], GarminApi]
     after_sync: list[AfterSyncHook] = field(default_factory=list)
-    _stop: threading.Event = field(default_factory=threading.Event)
+    name: str = "daily-sync"
 
     def _last_scheduled_start(self) -> datetime | None:
         conn = connect(self.settings.db_path)
@@ -60,7 +71,11 @@ class DailySync:
             return None
         return datetime.strptime(row[0], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
 
-    def run_once(self) -> sync.SyncResult | None:
+    def due(self, now: datetime) -> bool:
+        last = self._last_scheduled_start()
+        return missed_today(now, parse_hhmm(self.settings.sync_time), last)
+
+    def run(self) -> sync.SyncResult | None:
         conn = connect(self.settings.db_path)
         try:
             result = sync.sync_recent(
@@ -84,27 +99,70 @@ class DailySync:
                 log.exception("after-sync hook failed")
         return result
 
+    # kept for the CLI and tests
+    run_once = run
+
+
+@dataclass
+class WeeklyReport:
+    """Writes last week's PDF on Sundays after ``report_time`` (for the week ending today)."""
+
+    settings: Settings
+    name: str = "weekly-report"
+
+    def week_monday(self, now: datetime) -> date:
+        return now.date() - timedelta(days=now.weekday())
+
+    def due(self, now: datetime) -> bool:
+        from pulse_mirror.reports.pdf import report_filename
+
+        if now.weekday() != 6 or now.time() < parse_hhmm(self.settings.report_time):
+            return False
+        return not (self.settings.report_dir / report_filename(self.week_monday(now))).exists()
+
+    def run(self) -> object:
+        from pulse_mirror.reports.pdf import write_weekly_report
+
+        conn = connect(self.settings.db_path)
+        try:
+            path = write_weekly_report(
+                conn,
+                self.week_monday(datetime.now(self.settings.timezone)),
+                self.settings.report_dir,
+            )
+        finally:
+            conn.close()
+        log.info("weekly report written to %s", path)
+        return path
+
+
+@dataclass
+class Scheduler:
+    settings: Settings
+    jobs: list[Job]
+    _stop: threading.Event = field(default_factory=threading.Event)
+
+    def tick(self, now: datetime | None = None) -> list[str]:
+        now = now or datetime.now(self.settings.timezone)
+        ran = []
+        for job in self.jobs:
+            try:
+                if job.due(now):
+                    log.info("running %s", job.name)
+                    job.run()
+                    ran.append(job.name)
+            except Exception:
+                log.exception("job %s failed", job.name)
+        return ran
+
     def _loop(self) -> None:
-        tz = self.settings.timezone
-        at = parse_hhmm(self.settings.sync_time)
-        last = self._last_scheduled_start()
-        if missed_today(datetime.now(tz), at, last.astimezone(tz) if last else None):
-            log.info("catching up on today's missed sync")
-            self.run_once()
+        log.info("scheduler started: %s", ", ".join(j.name for j in self.jobs))
         while not self._stop.is_set():
-            wake = next_run(datetime.now(tz), at)
-            log.info("next scheduled sync at %s", wake.isoformat())
-            # wake up at least hourly so clock changes (DST, NTP) can't drift us far
-            while not self._stop.is_set():
-                remaining = (wake - datetime.now(tz)).total_seconds()
-                if remaining <= 0:
-                    break
-                self._stop.wait(min(remaining, 3600))
-            if not self._stop.is_set():
-                self.run_once()
+            self.tick()
+            self._stop.wait(TICK_S)
 
     def start(self) -> threading.Thread:
-        thread = threading.Thread(target=self._loop, name="daily-sync", daemon=True)
+        thread = threading.Thread(target=self._loop, name="scheduler", daemon=True)
         thread.start()
         return thread
 

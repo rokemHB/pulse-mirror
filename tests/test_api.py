@@ -262,3 +262,12 @@ def test_ratings_from_device_are_tagged_app(client, settings):
     assert r["source"] == "app"
     row = connect(settings.db_path).execute("SELECT device_id FROM ratings").fetchone()
     assert row["device_id"] is not None
+
+
+def test_exports_and_weekly_pdf(client):
+    assert client.get("/api/v1/export/metrics.csv").headers["content-type"].startswith("text/csv")
+    assert client.get("/api/v1/export/nope.csv").status_code == 404
+    assert client.get("/api/v1/export/all.zip").content[:2] == b"PK"
+    r = client.get("/api/v1/reports/weekly.pdf", params={"week": "2025-W03"})
+    assert r.status_code == 200 and r.content.startswith(b"%PDF")
+    assert client.get("/api/v1/reports/weekly.pdf", params={"week": "2025-W99"}).status_code == 422

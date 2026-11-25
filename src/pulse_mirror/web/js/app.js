@@ -544,6 +544,14 @@ async function viewSettings() {
         <div class="muted small">${esc(t.prefix)}… · created ${esc(fmtDate(t.created_at))} · ${t.last_used_at ? `last used ${esc(ago(t.last_used_at))}` : "never used"}</div></div>
         ${t.revoked ? "" : `<button class="btn small danger" data-revoke="${t.id}">Revoke</button>`}</div>`).join("") || `<p class="muted small">No tokens.</p>`}</div>
       <button class="btn" data-newtoken ${demo ? "disabled" : ""}>New token</button></section>
+    <section class="card" style="margin-top:12px"><h3>Export</h3>
+      <p class="muted small">${demo ? "Exports need the real server; in the demo you can print the current view." : "All your data as CSV, or this week's report as PDF. Weekly PDFs are also written automatically on Sundays."}</p>
+      <div class="toolbar">
+        ${demo ? "" : `<a class="btn" href="api/v1/export/all.zip">All data (ZIP of CSVs)</a>
+        ${["metrics", "activities", "events", "ratings"].map((d) => `<a class="btn small" href="api/v1/export/${d}.csv">${d}.csv</a>`).join("")}
+        <a class="btn" href="api/v1/reports/weekly.pdf" target="_blank" rel="noopener">This week (PDF)</a>`}
+        <button class="btn" data-print>Print / save view as PDF</button>
+      </div></section>
     <section class="card" style="margin-top:12px"><h3>Session</h3>
       <div class="toolbar">${demo ? `<button class="btn" data-reset>Reset demo data</button>` : `<button class="btn" data-logout>Log out</button>`}
       <a class="btn" href="api/docs" style="text-decoration:none;display:inline-flex;align-items:center">API docs</a></div>
@@ -561,6 +569,7 @@ async function viewSettings() {
     await dialog("Token created", `<p>Copy it now. It won't be shown again.</p><input type="text" readonly value="${esc(t.token)}" onclick="this.select()">`, { submit: null });
     route();
   });
+  $("[data-print]", view).onclick = () => { location.hash = "#trends"; setTimeout(() => window.print(), 1200); };
   $("[data-logout]", view)?.addEventListener("click", () => guard(async () => { await api.logout(); renderLogin(); }));
   $("[data-reset]", view)?.addEventListener("click", () => { api.reset(); location.reload(); });
 }

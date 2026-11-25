@@ -2,7 +2,7 @@
 
 > A local mirror of your Garmin data, visualized your way – self-hosted on a Synology NAS.
 
-Status: **phase 0 approved; phases 1–3 implemented, phase 4 mostly** (see section 10).
+Status: **phases 0–5 implemented** (see section 10). Open: validation against real Garmin data, deployment on the NAS.
 
 ---
 
@@ -78,7 +78,7 @@ Laptop (Claude Code) ──push──▶ GitHub (public: code only)
 | Lint and format | `ruff` (lint + format), `mypy` on `sources/` and `api/` | |
 | Secrets scan | `gitleaks` as a pre-commit hook (via the `pre-commit` framework) and in CI | |
 | Deps updates | Dependabot (`uv` + GitHub Actions + Docker ecosystems) | Built into GitHub, no extra app. |
-| PDF (phase 5) | To be decided in phase 5: probably WeasyPrint (HTML → PDF, reusing the dashboard templates) or matplotlib + a simple PDF. | We decide when we get there, based on image size on the NAS. |
+| PDF (phase 5) | **reportlab** (pure Python, ~10 MB with pillow) for the weekly report; the dashboard's PDF button uses the browser's print-to-PDF with a print stylesheet | WeasyPrint needs system libraries, and matplotlib + numpy would add ~70 MB to the NAS image. |
 | Notifications (phase 5) | `Notifier` interface with pluggable backends (Telegram, SMTP email) | Decision D3: email. |
 
 ---

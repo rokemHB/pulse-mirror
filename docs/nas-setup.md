@@ -148,6 +148,28 @@ The same line, run by hand over SSH, updates immediately.
   `docker exec pulse-mirror pulse-mirror db backup`
 - Include `/volume1/docker/pulse-mirror/data` in **Hyper Backup**.
 
+## 10. Morning email and weekly PDF (optional)
+
+Add to `.env`, then restart the container:
+
+```bash
+PULSE_SMTP_HOST=smtp.example.com      # your mail provider's SMTP server
+PULSE_SMTP_PORT=587
+PULSE_SMTP_SECURITY=starttls          # or ssl with port 465
+PULSE_SMTP_USER=you@example.com
+PULSE_SMTP_PASSWORD=app-password      # an app password if your provider offers them
+PULSE_NOTIFY_TO=you@example.com
+```
+
+Test it with `docker exec pulse-mirror pulse-mirror notify test`. The summary is sent right after the
+daily sync. If the sync failed (for example because the Garmin login expired), you get an alert instead.
+Some providers require SMTP access to be switched on in their web settings first.
+
+**Weekly PDF in Synology Drive:** the report is written every Sunday at `PULSE_REPORT_TIME` (default
+20:00). To get it onto your devices, mount a Drive folder into the container and point the report
+directory at it. In `compose.yaml` under `volumes`, add
+`- /volume1/homes/<your-dsm-user>/Drive/pulse-mirror:/reports`, and in `.env` set `PULSE_REPORT_DIR=/reports`.
+
 ## Everyday commands
 
 ```bash

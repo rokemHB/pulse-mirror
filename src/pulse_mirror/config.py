@@ -21,10 +21,17 @@ class Settings:
     sync_time: str
     sync_days: int
     port: int
+    report_time: str
+    report_dir_override: Path | None
 
     @property
     def db_path(self) -> Path:
         return self.data_dir / "pulse.db"
+
+    @property
+    def report_dir(self) -> Path:
+        """Weekly PDFs. Point PULSE_REPORT_DIR at a Synology Drive folder to sync them."""
+        return self.report_dir_override or self.data_dir / "reports"
 
     @property
     def garmin_tokenstore(self) -> Path:
@@ -39,4 +46,8 @@ class Settings:
             sync_time=_env("PULSE_SYNC_TIME", "08:00"),
             sync_days=int(_env("PULSE_SYNC_DAYS", "3")),
             port=int(_env("PULSE_PORT", "8420")),
+            report_time=_env("PULSE_REPORT_TIME", "20:00"),
+            report_dir_override=Path(os.environ["PULSE_REPORT_DIR"]).expanduser()
+            if os.environ.get("PULSE_REPORT_DIR", "").strip()
+            else None,
         )

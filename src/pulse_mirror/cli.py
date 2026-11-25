@@ -204,12 +204,66 @@ def cmd_serve(settings: Settings, args: argparse.Namespace) -> int:
     import uvicorn
 
     from pulse_mirror.api.app import create_app
-    from pulse_mirror.sync.scheduler import DailySync
+    from pulse_mirror.sync.scheduler import DailySync, Scheduler, WeeklyReport
 
     app = create_app(settings, garmin_factory=lambda: _garmin_client(settings))
     if not args.no_scheduler:
-        DailySync(settings, lambda: _garmin_client(settings)).start()
+        daily = DailySync(settings, lambda: _garmin_client(settings),
+                          after_sync=[lambda r: _send_morning(settings, r)])  # fmt: skip
+        Scheduler(settings, [daily, WeeklyReport(settings)]).start()
     uvicorn.run(app, host=args.host, port=args.port or settings.port, log_level="info")
+    return 0
+
+
+def _send_morning(settings: Settings, result: object) -> None:
+    from pulse_mirror import notify
+    from pulse_mirror.reports.morning import compose
+
+    notifier = notify.from_env()
+    if notifier is None:
+        return
+    conn = connect(settings.db_path)
+    try:
+        subject, text = compose(conn, _today(settings), result)  # type: ignore[arg-type]
+    finally:
+        conn.close()
+    notifier.send(subject, text)
+    log.info("morning summary sent")
+
+
+def cmd_report_morning(settings: Settings, args: argparse.Namespace) -> int:
+    from pulse_mirror.reports.morning import compose
+
+    subject, text = compose(_open_db(settings), _today(settings), None)
+    print(subject, "", text, sep="\n")
+    return 0
+
+
+def cmd_report_weekly(settings: Settings, args: argparse.Namespace) -> int:
+    from datetime import timedelta
+
+    from pulse_mirror.reports.pdf import write_weekly_report
+
+    if args.week:
+        year, week = args.week.split("-W")
+        monday = date.fromisocalendar(int(year), int(week), 1)
+    else:
+        today = _today(settings)
+        monday = today - timedelta(days=today.weekday())
+    out = Path(args.out) if args.out else settings.report_dir
+    print(f"Wrote {write_weekly_report(_open_db(settings), monday, out)}")
+    return 0
+
+
+def cmd_notify_test(settings: Settings, args: argparse.Namespace) -> int:
+    from pulse_mirror import notify
+
+    notifier = notify.from_env()
+    if notifier is None:
+        print("No notifier configured (set PULSE_SMTP_HOST and PULSE_NOTIFY_TO, see .env.example).")
+        return 2
+    notifier.send("pulse-mirror test", "If you can read this, notifications work.\n")
+    print("Sent.")
     return 0
 
 
@@ -297,6 +351,18 @@ def build_parser() -> argparse.ArgumentParser:
     dp.add_argument("--out", default="site")
     dp.add_argument("--days", type=int, default=900)
     dp.set_defaults(func=cmd_demo_build_pages)
+
+    rep = sub.add_parser("report", help="summaries and PDF reports").add_subparsers(required=True)
+    rep.add_parser("morning", help="print the morning summary").set_defaults(
+        func=cmd_report_morning
+    )
+    w = rep.add_parser("weekly", help="write the weekly PDF")
+    w.add_argument("--week", help="ISO week like 2026-W47 (default: current week)")
+    w.add_argument("--out", help="directory (default: PULSE_REPORT_DIR or $DATA_DIR/reports)")
+    w.set_defaults(func=cmd_report_weekly)
+
+    nt = sub.add_parser("notify", help="notifications").add_subparsers(required=True)
+    nt.add_parser("test", help="send a test message").set_defaults(func=cmd_notify_test)
 
     sub.add_parser("remap", help="re-run mapping over stored raw data").set_defaults(func=cmd_remap)
     sub.add_parser("status", help="show sync status").set_defaults(func=cmd_status)

@@ -195,3 +195,14 @@ dialog .actions .spacer { margin-right: auto; }
   .tile .value { font-size: 26px; }
   .chart { height: 200px; }
 }
+
+a.btn { text-decoration: none; display: inline-flex; align-items: center; color: inherit; }
+
+@media print {
+  :root { color-scheme: light; }
+  .topbar, .tabs, .banner, .toolbar, [data-table], .toast { display: none !important; }
+  body { background: #fff; }
+  main { max-width: none; padding: 0; }
+  .card { box-shadow: none; break-inside: avoid; }
+  .charts { grid-template-columns: 1fr 1fr; }
+}

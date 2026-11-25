@@ -45,3 +45,44 @@ def test_run_once_records_scheduled_run_and_calls_hooks(tmp_path, monkeypatch):
     result = job.run_once()
     assert result is not None and result.status == "ok" and seen == [result]
     assert job._last_scheduled_start() is not None
+
+
+def test_weekly_report_due_only_sunday_evening_once(tmp_path, monkeypatch):
+    from pulse_mirror.sync.scheduler import WeeklyReport
+
+    monkeypatch.setenv("PULSE_DATA_DIR", str(tmp_path))
+    settings = Settings.from_env()
+    migrate(connect(settings.db_path))
+    job = WeeklyReport(settings)
+    assert not job.due(datetime(2025, 3, 1, 21, 0, tzinfo=TZ))  # Saturday
+    assert not job.due(datetime(2025, 3, 2, 19, 0, tzinfo=TZ))  # Sunday, too early
+    sunday = datetime(2025, 3, 2, 21, 0, tzinfo=TZ)
+    assert job.due(sunday)
+    from pulse_mirror.reports.pdf import write_weekly_report
+
+    write_weekly_report(connect(settings.db_path), job.week_monday(sunday), settings.report_dir)
+    assert not job.due(sunday)
+
+
+def test_scheduler_tick_isolates_failures(tmp_path, monkeypatch):
+    from pulse_mirror.sync.scheduler import Scheduler
+
+    monkeypatch.setenv("PULSE_DATA_DIR", str(tmp_path))
+    settings = Settings.from_env()
+
+    class Boom:
+        name = "boom"
+
+        def due(self, now):
+            return True
+
+        def run(self):
+            raise RuntimeError("x")
+
+    class Ok(Boom):
+        name = "ok"
+
+        def run(self):
+            return None
+
+    assert Scheduler(settings, [Boom(), Ok()]).tick() == ["ok"]

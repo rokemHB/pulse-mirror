@@ -14,7 +14,7 @@ Garmin keeps the original data. **pulse-mirror** keeps a complete local copy (in
 - A source-agnostic data model: Garmin is one source; manual events and self-rated wellbeing (with data-defined scales) are others
 - A versioned JSON API (`/api/v1`) with per-device tokens, ready for a mobile app
 - A mobile-friendly dashboard with interactive charts and events shown as bands and markers in every chart
-- PDF/CSV exports and a morning summary by email
+- CSV export, a weekly PDF report (Sundays, e.g. into a Synology Drive folder) and a morning summary by email
 - Runs as a single Docker container (amd64 + arm64)
 
 ## Running it
