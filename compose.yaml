@@ -1,0 +1,22 @@
+# pulse-mirror on a Synology NAS (Container Manager → Project) or any Docker host.
+# See docs/nas-setup.md. Real settings go into .env next to this file (never commit it).
+services:
+  pulse-mirror:
+    image: ghcr.io/rokemhb/pulse-mirror:latest
+    container_name: pulse-mirror
+    restart: unless-stopped
+    # Run as the NAS user that owns ./data (Synology: `id` in an SSH session).
+    user: "${PUID:-1000}:${PGID:-1000}"
+    env_file: .env   # create it from .env.example (it may stay almost empty)
+    environment:
+      PULSE_DATA_DIR: /data
+    ports:
+      - "${PULSE_PORT:-8420}:8420"
+    volumes:
+      - ./data:/data
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"

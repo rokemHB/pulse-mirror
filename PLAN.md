@@ -2,7 +2,7 @@
 
 > A local mirror of your Garmin data, visualized your way – self-hosted on a Synology NAS.
 
-Status: **phase 0 approved; phases 1–2 implemented** (see section 10).
+Status: **phase 0 approved; phases 1–3 implemented, phase 4 mostly** (see section 10).
 
 ---
 
@@ -52,7 +52,7 @@ Laptop (Claude Code) ──push──▶ GitHub (public: code only)
                       Synology NAS (Docker / Container Manager)
                       └─ pulse-mirror container (one image)
                          ├─ FastAPI app: /api/v1/* + static dashboard
-                         ├─ scheduler (in-process): daily sync 08:00, weekly report Sun
+                         ├─ scheduler (in-process thread): daily sync 08:00, weekly report Sun
                          ├─ CLI: login, sync, backfill, import-export, demo, …
                          └─ /data volume: pulse.db (SQLite), garmin tokens, raw/, reports/
 ```
@@ -71,7 +71,7 @@ Laptop (Claude Code) ──push──▶ GitHub (public: code only)
 | DB | SQLite (stdlib `sqlite3`, WAL mode) | No server, a single file on the volume. |
 | Migrations | Numbered plain `.sql` files plus a ~50-line runner (`PRAGMA user_version`) | Simple and transparent. No ORM or Alembic needed for this size. |
 | API | FastAPI + Pydantic v2 + Uvicorn | Versioned routes, automatic OpenAPI docs. |
-| Scheduler | APScheduler (in-process, cron triggers, configurable times) | Small and reliable. The alternative (Synology Task Scheduler + `docker exec`) splits the logic. |
+| Scheduler | A tiny in-process daily scheduler thread (`sync/scheduler.py`): configurable time, catch-up after restarts, DST-safe | No dependency needed for one daily job. (Changed from APScheduler during implementation.) |
 | Dashboard | Static HTML + vanilla JS modules + **Apache ECharts** (one vendored file), no build step | Zoom and range selection, shaded bands (`markArea`) and markers (`markPoint`) for events, works on mobile. With no Node toolchain it also deploys trivially to GitHub Pages. |
 | CLI | `argparse` (stdlib) | No extra dependency. |
 | Tests | `pytest`, fixtures as anonymized JSON | No network access in tests. |
@@ -253,7 +253,7 @@ pulse_mirror/
 1. **Adapter + DB + backfill, local on the laptop:** project skeleton, migrations, the Garmin adapter, recording and anonymizing fixtures, mapping tests, `login` / `sync` / `backfill` CLI, a first real backfill test over a few days. *(Touches your Garmin account: I'll ask before the first login.)*
 2. **API + dashboard + events + scales/ratings + demo:** all of section 7 and 8, the demo generator, GitHub Pages.
 3. **Docker + NAS:** Dockerfile, `compose.yaml`, the data volume, the scheduler, login on the NAS, starting the full backfill. Guide: `docs/nas-setup.md`.
-4. **Automation:** CI (ruff, mypy, pytest, gitleaks), the multi-arch image build to GHCR, Dependabot, auto-update (Watchtower, or a documented `docker compose pull && up -d`).
+4. **Automation:** CI (ruff, mypy, pytest, gitleaks), the multi-arch image build to GHCR, Dependabot, and auto-update via a weekly Synology Task Scheduler job (`docker compose pull && up -d`). Watchtower was dropped: the project was archived in December 2025, and it would have needed the Docker socket.
 5. **Exports + notifications:** CSV export, the PDF button, the Sunday PDF into a Synology Drive folder, the morning summary after the 08:00 sync.
 
 Small, testable steps, with one commit per finished step on feature branches (`main` stays releasable).

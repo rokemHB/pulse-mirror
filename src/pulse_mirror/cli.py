@@ -60,6 +60,25 @@ def cmd_db_migrate(settings: Settings, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_db_backup(settings: Settings, args: argparse.Namespace) -> int:
+    """Consistent online copy (SQLite backup API), safe while the server runs."""
+    import sqlite3
+
+    target_dir = settings.data_dir / "backups"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = target_dir / f"pulse-{datetime.now(settings.timezone):%Y%m%d-%H%M%S}.db"
+    src = connect(settings.db_path)
+    dst = sqlite3.connect(target)
+    with dst:
+        src.backup(dst)
+    dst.close()
+    backups = sorted(target_dir.glob("pulse-*.db"))
+    for old in backups[: -args.keep]:
+        old.unlink()
+    print(f"Backup written to {target} (keeping the newest {args.keep}).")
+    return 0
+
+
 def cmd_login_garmin(settings: Settings, args: argparse.Namespace) -> int:
     from pulse_mirror.sources.garmin.client import login_interactive
 
@@ -185,8 +204,11 @@ def cmd_serve(settings: Settings, args: argparse.Namespace) -> int:
     import uvicorn
 
     from pulse_mirror.api.app import create_app
+    from pulse_mirror.sync.scheduler import DailySync
 
     app = create_app(settings, garmin_factory=lambda: _garmin_client(settings))
+    if not args.no_scheduler:
+        DailySync(settings, lambda: _garmin_client(settings)).start()
     uvicorn.run(app, host=args.host, port=args.port or settings.port, log_level="info")
     return 0
 
@@ -230,6 +252,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     db = sub.add_parser("db", help="database maintenance").add_subparsers(required=True)
     db.add_parser("migrate", help="apply pending migrations").set_defaults(func=cmd_db_migrate)
+    b = db.add_parser("backup", help="write a consistent copy to $DATA_DIR/backups/")
+    b.add_argument("--keep", type=int, default=14, help="number of backups to keep")
+    b.set_defaults(func=cmd_db_backup)
 
     login = sub.add_parser("login", help="interactive login").add_subparsers(required=True)
     login.add_parser("garmin", help="log in to Garmin Connect").set_defaults(func=cmd_login_garmin)
@@ -254,6 +279,7 @@ def build_parser() -> argparse.ArgumentParser:
     srv = sub.add_parser("serve", help="run the API + dashboard")
     srv.add_argument("--host", default="0.0.0.0")
     srv.add_argument("--port", type=int, help="default PULSE_PORT (8420)")
+    srv.add_argument("--no-scheduler", action="store_true", help="don't run the daily sync")
     srv.set_defaults(func=cmd_serve)
 
     au = sub.add_parser("auth", help="dashboard login").add_subparsers(required=True)

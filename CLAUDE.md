@@ -17,7 +17,7 @@ A self-hosted local mirror of Garmin data plus manual events and wellbeing ratin
 
 ## Architecture in one breath
 
-One image and one container: FastAPI (`/api/v1`, `/api/docs`, static dashboard) + an in-process APScheduler (daily sync, weekly report) + CLI commands (`login`, `sync`, `backfill`, `import`, `demo`) run via `docker exec`. SQLite (WAL) lives in the `/data` volume. Raw Garmin responses are stored first and mapped second, so mappings can be re-run without fetching again.
+One image and one container: FastAPI (`/api/v1`, `/api/docs`, static dashboard) + a tiny in-process scheduler thread (daily sync, later weekly report) + CLI commands (`login`, `sync`, `backfill`, `import`, `demo`) run via `docker exec`. SQLite (WAL) lives in the `/data` volume. Raw Garmin responses are stored first and mapped second, so mappings can be re-run without fetching again.
 
 ## Layout
 

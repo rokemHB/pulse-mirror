@@ -17,6 +17,10 @@ Garmin keeps the original data. **pulse-mirror** keeps a complete local copy (in
 - PDF/CSV exports and a morning summary by email
 - Runs as a single Docker container (amd64 + arm64)
 
+## Running it
+
+See **[docs/nas-setup.md](docs/nas-setup.md)** for a step-by-step Synology setup. In short: copy `compose.yaml`, create `.env` from `.env.example`, `docker compose up -d`, then run the two interactive logins with `docker exec -it`.
+
 ## Development
 
 ```bash
