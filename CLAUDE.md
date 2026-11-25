@@ -25,7 +25,7 @@ One image and one container: FastAPI (`/api/v1`, `/api/docs`, static dashboard) 
 - `src/pulse_mirror/sources/garmin/`: the adapter (`client`, `auth`, `mapping`, `fetch`, `backfill`, `export_zip`)
 - `src/pulse_mirror/sync/`: sync service (lock, cooldown, run log), scheduler
 - `src/pulse_mirror/api/`: FastAPI app, auth, `v1/` routers
-- `src/pulse_mirror/web/`: static dashboard (vanilla JS + ECharts, no build step)
+- `src/pulse_mirror/web/`: static dashboard (vanilla JS modules + vendored ECharts, no build step). `js/api.js` has a live and a static (demo) adapter; keep both in sync with the API.
 - `src/pulse_mirror/demo/`: synthetic data generator and GitHub Pages builder
 - `tests/fixtures/garmin/`: **anonymized** responses only. `_raw/` is git-ignored.
 
@@ -37,6 +37,8 @@ One image and one container: FastAPI (`/api/v1`, `/api/docs`, static dashboard) 
 - Tests never touch the network. Mapping code consists of pure functions with fixture tests.
 - Work on feature branches with small commits. Run before every commit: `ruff check`, `ruff format --check`, `mypy`, `pytest`, `gitleaks` (via pre-commit).
 - Keep it simple: add a dependency only when it's clearly worth it.
+- Charts: one y-axis per chart (small multiples or indexed overlays instead), fixed color per metric (`METRIC_SLOT`), events in every time chart, a table view for every chart. Escape user text (`esc()`) in any HTML string.
+- Check UI changes by rendering them (`pulse-mirror demo serve` + a headless browser), on desktop and phone widths, light and dark.
 
 ## Credits
 

@@ -31,6 +31,7 @@ def create_app(
     garmin_factory: Callable[[], GarminApi] | None = None,
     throttle_factory: Callable[[], Throttle] | None = None,
     demo: bool = False,
+    auth_disabled: bool = False,
 ) -> FastAPI:
     """Build the app. ``garmin_factory=None`` disables syncing (demo mode, tests)."""
     conn = connect(settings.db_path)
@@ -48,12 +49,13 @@ def create_app(
     stored = auth.load_auth(settings.data_dir) or {}
     app.state.settings = settings
     app.state.demo = demo
+    app.state.auth_disabled = auth_disabled
     app.state.garmin_factory = garmin_factory
     app.state.throttle_factory = throttle_factory or (lambda: Throttle(settings.garmin_delay_s))
     app.state.password_hash = stored.get("password_hash")
     # Without auth.json nobody can log in; a random key still keeps cookies unforgeable.
     app.state.secret_key = stored.get("secret_key") or secrets.token_hex(32)
-    if not app.state.password_hash:
+    if not app.state.password_hash and not auth_disabled:
         log.warning("No dashboard password set. Run `pulse-mirror auth set-password`.")
 
     app.include_router(v1)

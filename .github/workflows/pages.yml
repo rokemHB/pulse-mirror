@@ -1,0 +1,43 @@
+name: Demo (GitHub Pages)
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 5 * * *"  # daily, so the demo's "today" stays current
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.4.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked --no-dev
+      - run: uv run --no-dev pulse-mirror demo build-pages --out site
+        env:
+          TZ: Europe/Berlin
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

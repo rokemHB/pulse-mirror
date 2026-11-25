@@ -2,7 +2,7 @@
 
 > A local mirror of your Garmin data, visualized your way – self-hosted on a Synology NAS.
 
-Status: **phase 0 – decisions recorded, awaiting final OK**.
+Status: **phase 0 approved; phases 1–2 implemented** (see section 10).
 
 ---
 
@@ -213,10 +213,10 @@ GET                /export/csv?what=all|metrics|events|ratings|activities
 ## 8. Dashboard
 
 - **Header:** a prominent sync status ("updated 12 min ago" / a red "last sync failed 2 days ago: re-login required"), a refresh button (disabled during the cooldown) and a quick-add "+" for events and ratings.
-- **Views:** Today (values against 7d/28d baselines), Trends (4 weeks), Long-term (months and years, weekly or monthly aggregates), Activities, Wellbeing (ratings, each overlayable with any Garmin metric on a second axis).
+- **Views:** Today (values against 7d/28d baselines), Trends (4 weeks), Long-term (months and years, weekly or monthly aggregates), Activities, Wellbeing (ratings, overlayable with a Garmin metric; the overlay is indexed to 0–100 % of each series' own range with raw values in the tooltip, because a chart never gets a second y-axis).
 - **Events in every chart:** spans as shaded bands, points as marker lines, with details on hover or tap and tap-to-edit. Quick-add defaults to "now" or "last night" (22:00–07:00).
 - **Rating form:** one slider per active scale and an optional note. It writes through `PUT /ratings/{uuid}`, the same as the app will.
-- **Demo mode:** the same frontend with a `static` data adapter that reads pre-generated JSON files laid out like the API paths. `pulse-mirror demo build-pages` generates synthetic data (two-plus years with a realistic resting HR/HRV/sleep relationship, seasonality, training blocks, a few made-up events like "Alpine cycling trip" or "Flu", and ratings), then writes `site/`, which a GitHub Action publishes to GitHub Pages.
+- **Demo mode:** the same frontend with a `static` data adapter that reads pre-generated JSON snapshots (produced by the real endpoint functions) and keeps edits in localStorage. `pulse-mirror demo serve` runs the real server on throwaway synthetic data. `pulse-mirror demo build-pages` generates synthetic data (two-plus years with a realistic resting HR/HRV/sleep relationship, seasonality, training blocks, a few made-up events like "Alpine cycling trip" or "Flu", and ratings), then writes `site/`, which a GitHub Action publishes to GitHub Pages.
 
 ---
 
@@ -248,7 +248,8 @@ pulse_mirror/
 
 ## 10. Phases (with the concrete deliverables)
 
-0. **Plan** (this document + `CLAUDE.md`). → Your OK.
+0. **Plan** (this document + `CLAUDE.md`). ✅
+   - *Status 2026-11-25:* phases 1 and 2 are implemented. Phase 1 is still waiting for validation against real, recorded Garmin responses (needs the first interactive login).
 1. **Adapter + DB + backfill, local on the laptop:** project skeleton, migrations, the Garmin adapter, recording and anonymizing fixtures, mapping tests, `login` / `sync` / `backfill` CLI, a first real backfill test over a few days. *(Touches your Garmin account: I'll ask before the first login.)*
 2. **API + dashboard + events + scales/ratings + demo:** all of section 7 and 8, the demo generator, GitHub Pages.
 3. **Docker + NAS:** Dockerfile, `compose.yaml`, the data volume, the scheduler, login on the NAS, starting the full backfill. Guide: `docs/nas-setup.md`.

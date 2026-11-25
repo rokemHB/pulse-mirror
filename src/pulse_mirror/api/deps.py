@@ -30,6 +30,8 @@ Db = Annotated[sqlite3.Connection, Depends(get_db)]
 
 
 def get_principal(request: Request, db: Db) -> auth.Principal:
+    if request.app.state.auth_disabled:  # only for `pulse-mirror demo serve`
+        return auth.Principal("session")
     header = request.headers.get("authorization", "")
     if header.lower().startswith("bearer "):
         token_id = auth.check_token(db, header[7:].strip())

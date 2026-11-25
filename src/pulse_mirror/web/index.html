@@ -1,1 +1,52 @@
-<!doctype html><title>pulse-mirror</title>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>pulse-mirror</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M2 17h7l3-8 5 15 4-11 2 4h7' fill='none' stroke='%23257de0' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/app.css">
+  <script src="config.js"></script>
+  <script src="vendor/echarts.min.js" defer></script>
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M2 17h7l3-8 5 15 4-11 2 4h7"/></svg>
+      <span>pulse-mirror</span>
+      <span class="demo-badge" hidden>demo</span>
+    </div>
+    <button class="sync-pill" id="sync-pill" type="button" title="Sync status">
+      <span class="dot"></span><span class="label">…</span>
+    </button>
+    <button class="icon-btn" id="refresh-btn" type="button" title="Fetch new data from Garmin Connect" aria-label="Refresh">
+      <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg>
+    </button>
+    <button class="add-btn" id="add-btn" type="button" aria-haspopup="menu" aria-label="Add">+</button>
+    <div class="menu" id="add-menu" role="menu" hidden>
+      <button role="menuitem" data-add="now">Event: now</button>
+      <button role="menuitem" data-add="night">Event: last night</button>
+      <button role="menuitem" data-add="span">Event: time span…</button>
+      <button role="menuitem" data-add="rating">Rate my wellbeing</button>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs" aria-label="Views">
+    <a href="#today">Today</a>
+    <a href="#trends">Trends</a>
+    <a href="#longterm">Long-term</a>
+    <a href="#activities">Activities</a>
+    <a href="#wellbeing">Wellbeing</a>
+    <a href="#events">Events</a>
+    <a href="#settings">Settings</a>
+  </nav>
+
+  <div class="banner" id="banner" hidden></div>
+  <main id="view" tabindex="-1"></main>
+
+  <dialog id="dialog"><form method="dialog" id="dialog-form"></form></dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

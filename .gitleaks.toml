@@ -1,0 +1,9 @@
+# Extends the default gitleaks rules with narrow, reviewed exceptions.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Dashboard metric definitions like `key: \"vo2max_cycling\"` are identifiers, not secrets"
+regexTarget = "line"
+regexes = ['''^\s*\{ key: "[a-z][a-z0-9_]*"''']
+paths = ['''^src/pulse_mirror/web/js/''']

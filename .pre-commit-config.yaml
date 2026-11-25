@@ -9,8 +9,11 @@ repos:
     hooks:
       - id: check-added-large-files
         args: ["--maxkb=500"]
+        exclude: ^src/pulse_mirror/web/vendor/
       - id: end-of-file-fixer
+        exclude: ^src/pulse_mirror/web/vendor/
       - id: trailing-whitespace
+        exclude: ^src/pulse_mirror/web/vendor/
       - id: check-yaml
       - id: check-toml
   - repo: local

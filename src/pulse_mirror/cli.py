@@ -7,6 +7,7 @@ import getpass
 import logging
 import sqlite3
 import sys
+from dataclasses import replace
 from datetime import date, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -165,6 +166,59 @@ def cmd_dev_anonymize(settings: Settings, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_auth_set_password(settings: Settings, args: argparse.Namespace) -> int:
+    from pulse_mirror.api.auth import set_password
+
+    first = getpass.getpass("New dashboard password: ")
+    if len(first) < 8:
+        print("Use at least 8 characters.")
+        return 2
+    if getpass.getpass("Repeat: ") != first:
+        print("Passwords don't match.")
+        return 2
+    set_password(settings.data_dir, first)
+    print(f"Saved (hashed) to {settings.data_dir / 'auth.json'}. Restart the server to apply.")
+    return 0
+
+
+def cmd_serve(settings: Settings, args: argparse.Namespace) -> int:
+    import uvicorn
+
+    from pulse_mirror.api.app import create_app
+
+    app = create_app(settings, garmin_factory=lambda: _garmin_client(settings))
+    uvicorn.run(app, host=args.host, port=args.port or settings.port, log_level="info")
+    return 0
+
+
+def cmd_demo_serve(settings: Settings, args: argparse.Namespace) -> int:
+    import tempfile
+
+    import uvicorn
+
+    from pulse_mirror.api.app import create_app
+    from pulse_mirror.demo.generator import generate
+
+    with tempfile.TemporaryDirectory() as tmp:
+        demo_settings = replace(settings, data_dir=Path(tmp))
+        conn = connect(demo_settings.db_path)
+        migrate(conn)
+        generate(conn, _today(settings), args.days)
+        conn.close()
+        app = create_app(demo_settings, demo=True, auth_disabled=True)
+        print("Demo mode: synthetic data, no login, nothing is saved.")
+        uvicorn.run(app, host=args.host, port=args.port or settings.port, log_level="info")
+    return 0
+
+
+def cmd_demo_build_pages(settings: Settings, args: argparse.Namespace) -> int:
+    from pulse_mirror.demo.pages import build_pages
+
+    out = build_pages(Path(args.out), _today(settings), args.days)
+    print(f"Static demo written to {out}")
+    return 0
+
+
 # --- parser ------------------------------------------------------------------------
 
 
@@ -196,6 +250,27 @@ def build_parser() -> argparse.ArgumentParser:
     )
     g.add_argument("--restart", action="store_true", help="forget progress and start over")
     g.set_defaults(func=cmd_backfill_garmin)
+
+    srv = sub.add_parser("serve", help="run the API + dashboard")
+    srv.add_argument("--host", default="0.0.0.0")
+    srv.add_argument("--port", type=int, help="default PULSE_PORT (8420)")
+    srv.set_defaults(func=cmd_serve)
+
+    au = sub.add_parser("auth", help="dashboard login").add_subparsers(required=True)
+    au.add_parser("set-password", help="set the dashboard password").set_defaults(
+        func=cmd_auth_set_password
+    )
+
+    demo = sub.add_parser("demo", help="synthetic demo data").add_subparsers(required=True)
+    ds = demo.add_parser("serve", help="run the dashboard on throwaway synthetic data")
+    ds.add_argument("--host", default="127.0.0.1")
+    ds.add_argument("--port", type=int)
+    ds.add_argument("--days", type=int, default=900)
+    ds.set_defaults(func=cmd_demo_serve)
+    dp = demo.add_parser("build-pages", help="build the static GitHub Pages demo")
+    dp.add_argument("--out", default="site")
+    dp.add_argument("--days", type=int, default=900)
+    dp.set_defaults(func=cmd_demo_build_pages)
 
     sub.add_parser("remap", help="re-run mapping over stored raw data").set_defaults(func=cmd_remap)
     sub.add_parser("status", help="show sync status").set_defaults(func=cmd_status)
