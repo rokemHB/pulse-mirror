@@ -184,6 +184,7 @@ const TILES = [
   { key: "sleep_score" },
   { key: "body_battery_max", label: "Body Battery (high)" },
   { key: "stress_avg", lowerIsBetter: true },
+  { key: "vo2max_running", digits: 1 },
   { key: "vo2max_cycling", digits: 1 },
   { key: "training_load_acute", label: "Acute load" },
 ];
