@@ -1,0 +1,36 @@
+# --- personal data & secrets: never commit ---
+data/
+*.db
+*.db-*
+*.sqlite*
+.env
+.env.*
+!.env.example
+garmin_tokens/
+*tokens*.json
+exports/
+reports/
+*.zip
+tests/fixtures/garmin/_raw/
+KICKOFF*.md
+
+# --- python ---
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# --- demo build output ---
+site/
+
+# --- editors / OS ---
+.idea/
+.vscode/
+.DS_Store
