@@ -1,5 +1,5 @@
 # --- personal data & secrets: never commit ---
-data/
+/data/
 *.db
 *.db-*
 *.sqlite*
@@ -8,8 +8,8 @@ data/
 !.env.example
 garmin_tokens/
 *tokens*.json
-exports/
-reports/
+/exports/
+/reports/
 *.zip
 tests/fixtures/garmin/_raw/
 KICKOFF*.md

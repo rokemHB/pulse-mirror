@@ -13,7 +13,7 @@ from typing import Any
 
 from pulse_mirror.model import Activity, MetricValue
 
-MAPPER_VERSION = 1
+MAPPER_VERSION = 2
 
 
 def dig(data: Any, *path: str | int) -> Any:
@@ -139,6 +139,9 @@ def map_max_metrics(day: str, p: Any) -> Iterator[MetricValue]:
 
 
 def map_training_status(day: str, p: Any) -> Iterator[MetricValue]:
+    # VO2max also arrives here (max_metrics is empty on days without an update);
+    # only take it on the day Garmin actually updated it.
+    yield from map_max_metrics(day, dig(p, "mostRecentVO2Max"))
     latest = _primary_device_entry(dig(p, "mostRecentTrainingStatus", "latestTrainingStatusData"))
     if not isinstance(latest, dict) or latest.get("calendarDate", day) != day:
         return

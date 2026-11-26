@@ -123,3 +123,26 @@ def test_map_activity():
     assert run is not None and run.avg_power is None and run.elevation_gain_m == 0
     assert mapping.map_activity({"activityId": 1}) is None
     assert mapping.map_activity("nope") is None
+
+
+def test_recorded_responses_map_fully():
+    """Real (anonymized) responses: everything except VO2max (not updated that day) maps."""
+    if "recorded" not in fixture_sets():
+        pytest.skip("no recorded fixtures")
+    payloads = load_fixture_dir("recorded")
+    keys = {v.metric_key for v in mapping.map_day(FIXTURE_DAY, payloads)}
+    assert len(keys) >= 28
+    assert {"hrv_status", "training_status", "training_load_acute", "sleep_score"} <= keys
+    acts = [mapping.map_activity(a) for a in payloads["activities"]]
+    assert acts and all(a is not None and a.duration_s and a.training_load for a in acts)
+
+
+def test_vo2max_from_training_status_on_update_day():
+    ts = {
+        "mostRecentVO2Max": {
+            "generic": {"calendarDate": FIXTURE_DAY, "vo2MaxPreciseValue": 50.4},
+            "cycling": None,
+        }
+    }
+    assert values({"training_status": ts})["vo2max_running"] == 50.4
+    assert values({"training_status": ts, "max_metrics": []})["vo2max_running"] == 50.4

@@ -7,6 +7,7 @@ import getpass
 import logging
 import sqlite3
 import sys
+from dataclasses import replace
 from datetime import date, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -56,6 +57,25 @@ def cmd_db_migrate(settings: Settings, args: argparse.Namespace) -> int:
     conn = connect(settings.db_path)
     applied = migrate(conn)
     print(f"Applied: {', '.join(applied)}" if applied else "Database is up to date.")
+    return 0
+
+
+def cmd_db_backup(settings: Settings, args: argparse.Namespace) -> int:
+    """Consistent online copy (SQLite backup API), safe while the server runs."""
+    import sqlite3
+
+    target_dir = settings.data_dir / "backups"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = target_dir / f"pulse-{datetime.now(settings.timezone):%Y%m%d-%H%M%S}.db"
+    src = connect(settings.db_path)
+    dst = sqlite3.connect(target)
+    with dst:
+        src.backup(dst)
+    dst.close()
+    backups = sorted(target_dir.glob("pulse-*.db"))
+    for old in backups[: -args.keep]:
+        old.unlink()
+    print(f"Backup written to {target} (keeping the newest {args.keep}).")
     return 0
 
 
@@ -110,7 +130,7 @@ def cmd_backfill_garmin(settings: Settings, args: argparse.Namespace) -> int:
         stop_before=date.fromisoformat(args.since) if args.since else None,
         max_days=args.max_days,
         empty_stop=args.empty_stop,
-        progress=print,
+        progress=lambda msg: print(msg, flush=True),
     )
     return 0 if result.status in ("done", "paused") and "429" not in result.message else 1
 
@@ -165,6 +185,116 @@ def cmd_dev_anonymize(settings: Settings, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_auth_set_password(settings: Settings, args: argparse.Namespace) -> int:
+    from pulse_mirror.api.auth import set_password
+
+    first = getpass.getpass("New dashboard password: ")
+    if len(first) < 8:
+        print("Use at least 8 characters.")
+        return 2
+    if getpass.getpass("Repeat: ") != first:
+        print("Passwords don't match.")
+        return 2
+    set_password(settings.data_dir, first)
+    print(f"Saved (hashed) to {settings.data_dir / 'auth.json'}. Restart the server to apply.")
+    return 0
+
+
+def cmd_serve(settings: Settings, args: argparse.Namespace) -> int:
+    import uvicorn
+
+    from pulse_mirror.api.app import create_app
+    from pulse_mirror.sync.scheduler import DailySync, Scheduler, WeeklyReport
+
+    app = create_app(settings, garmin_factory=lambda: _garmin_client(settings))
+    if not args.no_scheduler:
+        daily = DailySync(settings, lambda: _garmin_client(settings),
+                          after_sync=[lambda r: _send_morning(settings, r)])  # fmt: skip
+        Scheduler(settings, [daily, WeeklyReport(settings)]).start()
+    uvicorn.run(app, host=args.host, port=args.port or settings.port, log_level="info")
+    return 0
+
+
+def _send_morning(settings: Settings, result: object) -> None:
+    from pulse_mirror import notify
+    from pulse_mirror.reports.morning import compose
+
+    notifier = notify.from_env()
+    if notifier is None:
+        return
+    conn = connect(settings.db_path)
+    try:
+        subject, text = compose(conn, _today(settings), result)  # type: ignore[arg-type]
+    finally:
+        conn.close()
+    notifier.send(subject, text)
+    log.info("morning summary sent")
+
+
+def cmd_report_morning(settings: Settings, args: argparse.Namespace) -> int:
+    from pulse_mirror.reports.morning import compose
+
+    subject, text = compose(_open_db(settings), _today(settings), None)
+    print(subject, "", text, sep="\n")
+    return 0
+
+
+def cmd_report_weekly(settings: Settings, args: argparse.Namespace) -> int:
+    from datetime import timedelta
+
+    from pulse_mirror.reports.pdf import write_weekly_report
+
+    if args.week:
+        year, week = args.week.split("-W")
+        monday = date.fromisocalendar(int(year), int(week), 1)
+    else:
+        today = _today(settings)
+        monday = today - timedelta(days=today.weekday())
+    out = Path(args.out) if args.out else settings.report_dir
+    print(f"Wrote {write_weekly_report(_open_db(settings), monday, out)}")
+    return 0
+
+
+def cmd_notify_test(settings: Settings, args: argparse.Namespace) -> int:
+    from pulse_mirror import notify
+
+    notifier = notify.from_env()
+    if notifier is None:
+        print("No notifier configured (set PULSE_SMTP_HOST and PULSE_NOTIFY_TO, see .env.example).")
+        return 2
+    notifier.send("pulse-mirror test", "If you can read this, notifications work.\n")
+    print("Sent.")
+    return 0
+
+
+def cmd_demo_serve(settings: Settings, args: argparse.Namespace) -> int:
+    import tempfile
+
+    import uvicorn
+
+    from pulse_mirror.api.app import create_app
+    from pulse_mirror.demo.generator import generate
+
+    with tempfile.TemporaryDirectory() as tmp:
+        demo_settings = replace(settings, data_dir=Path(tmp))
+        conn = connect(demo_settings.db_path)
+        migrate(conn)
+        generate(conn, _today(settings), args.days)
+        conn.close()
+        app = create_app(demo_settings, demo=True, auth_disabled=True)
+        print("Demo mode: synthetic data, no login, nothing is saved.")
+        uvicorn.run(app, host=args.host, port=args.port or settings.port, log_level="info")
+    return 0
+
+
+def cmd_demo_build_pages(settings: Settings, args: argparse.Namespace) -> int:
+    from pulse_mirror.demo.pages import build_pages
+
+    out = build_pages(Path(args.out), _today(settings), args.days)
+    print(f"Static demo written to {out}")
+    return 0
+
+
 # --- parser ------------------------------------------------------------------------
 
 
@@ -176,6 +306,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     db = sub.add_parser("db", help="database maintenance").add_subparsers(required=True)
     db.add_parser("migrate", help="apply pending migrations").set_defaults(func=cmd_db_migrate)
+    b = db.add_parser("backup", help="write a consistent copy to $DATA_DIR/backups/")
+    b.add_argument("--keep", type=int, default=14, help="number of backups to keep")
+    b.set_defaults(func=cmd_db_backup)
 
     login = sub.add_parser("login", help="interactive login").add_subparsers(required=True)
     login.add_parser("garmin", help="log in to Garmin Connect").set_defaults(func=cmd_login_garmin)
@@ -196,6 +329,40 @@ def build_parser() -> argparse.ArgumentParser:
     )
     g.add_argument("--restart", action="store_true", help="forget progress and start over")
     g.set_defaults(func=cmd_backfill_garmin)
+
+    srv = sub.add_parser("serve", help="run the API + dashboard")
+    srv.add_argument("--host", default="0.0.0.0")
+    srv.add_argument("--port", type=int, help="default PULSE_PORT (8420)")
+    srv.add_argument("--no-scheduler", action="store_true", help="don't run the daily sync")
+    srv.set_defaults(func=cmd_serve)
+
+    au = sub.add_parser("auth", help="dashboard login").add_subparsers(required=True)
+    au.add_parser("set-password", help="set the dashboard password").set_defaults(
+        func=cmd_auth_set_password
+    )
+
+    demo = sub.add_parser("demo", help="synthetic demo data").add_subparsers(required=True)
+    ds = demo.add_parser("serve", help="run the dashboard on throwaway synthetic data")
+    ds.add_argument("--host", default="127.0.0.1")
+    ds.add_argument("--port", type=int)
+    ds.add_argument("--days", type=int, default=900)
+    ds.set_defaults(func=cmd_demo_serve)
+    dp = demo.add_parser("build-pages", help="build the static GitHub Pages demo")
+    dp.add_argument("--out", default="site")
+    dp.add_argument("--days", type=int, default=900)
+    dp.set_defaults(func=cmd_demo_build_pages)
+
+    rep = sub.add_parser("report", help="summaries and PDF reports").add_subparsers(required=True)
+    rep.add_parser("morning", help="print the morning summary").set_defaults(
+        func=cmd_report_morning
+    )
+    w = rep.add_parser("weekly", help="write the weekly PDF")
+    w.add_argument("--week", help="ISO week like 2026-W47 (default: current week)")
+    w.add_argument("--out", help="directory (default: PULSE_REPORT_DIR or $DATA_DIR/reports)")
+    w.set_defaults(func=cmd_report_weekly)
+
+    nt = sub.add_parser("notify", help="notifications").add_subparsers(required=True)
+    nt.add_parser("test", help="send a test message").set_defaults(func=cmd_notify_test)
 
     sub.add_parser("remap", help="re-run mapping over stored raw data").set_defaults(func=cmd_remap)
     sub.add_parser("status", help="show sync status").set_defaults(func=cmd_status)
