@@ -24,7 +24,10 @@ ssh-keygen -t ed25519 -f ~/.ssh/id_nas -C "laptop → nas"   # skip if you alrea
 ssh-copy-id -i ~/.ssh/id_nas.pub <your-dsm-user>@<nas-name>.fritz.box
 ```
 
-Synology refuses keys while the home folder is group-writable, so fix the permissions once, on the NAS:
+Synology refuses keys while the home folder is group-writable, so fix the permissions once, on the NAS.
+If SSH says `Could not chdir to home directory … Permission denied`, your user has no access to the
+`homes` shared folder: check *Control Panel → Shared Folder → homes → Edit → Permissions* for a
+"No access" tick on your user or on one of its groups.
 
 ```bash
 ssh <your-dsm-user>@<nas-name>.fritz.box
@@ -47,6 +50,10 @@ Only do it once key login works.
 **Docker without sudo (optional, convenient for logs and restarts):**
 
 1. 🖐 **Control Panel → User & Group → Group**: create a group `docker` and add your user.
+   In the wizard's *shared folder permissions* step, **leave every row completely unticked**.
+   ⚠️ Don't tick "No access": in DSM that is an explicit *deny* rule, and deny beats allow. Because
+   your own user is in the group, it would lock you out of `homes` (and so out of SSH keys) and of
+   every other shared folder.
 2. Hand the Docker socket to that group:
    - 🖐 **Control Panel → Task Scheduler → Create → Triggered Task → User-defined script**
    - User: `root`, Event: `Boot-up`
@@ -54,6 +61,10 @@ Only do it once key login works.
    - Run the task once by hand.
 
 Otherwise, prefix the Docker commands below with `sudo`.
+
+Over a non-interactive SSH session, Docker isn't on the `PATH`. Use `/usr/local/bin/docker`.
+DSM also has SFTP switched off by default, so plain `scp` fails; use `scp -O` or pipe through SSH
+(`ssh nas 'cat > file' < file`).
 
 ## 3. Fixed address in the FRITZ!Box (2 min)
 
@@ -114,6 +125,10 @@ repeated logins. If a login fails, wait at least 30 minutes before you try again
 Then open **`http://<nas-name>.fritz.box:8420`** on your phone or laptop and log in.
 
 ## 7. Load the history: backfill (runs one or two nights)
+
+*Already ran the backfill on another machine?* Stop it there (Ctrl-C saves its position), copy
+`data/pulse.db` and `data/garmin_tokens/` into the NAS's `data/` folder before the first start, and
+rename the token folder on the old machine so that only one place uses the Garmin login.
 
 ```bash
 docker exec -d pulse-mirror sh -c 'pulse-mirror backfill garmin >> /data/backfill.log 2>&1'
