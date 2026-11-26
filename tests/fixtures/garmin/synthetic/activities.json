@@ -1,0 +1,34 @@
+[
+  {
+    "activityId": 1000004,
+    "activityName": "Activity",
+    "startTimeLocal": "2025-01-15 17:05:12",
+    "startTimeGMT": "2025-01-15 16:05:12",
+    "activityType": {"typeId": 2, "typeKey": "cycling", "parentTypeId": 17},
+    "duration": 5432.1,
+    "movingDuration": 5301.0,
+    "distance": 41230.5,
+    "elevationGain": 412.0,
+    "averageHR": 138.0,
+    "maxHR": 171.0,
+    "avgPower": 196.0,
+    "normPower": 214.0,
+    "calories": 1104.0,
+    "aerobicTrainingEffect": 3.4,
+    "anaerobicTrainingEffect": 1.1,
+    "activityTrainingLoad": 142.7
+  },
+  {
+    "activityId": 1000005,
+    "activityName": "Activity",
+    "startTimeLocal": "2025-01-13 07:30:00",
+    "startTimeGMT": "2025-01-13 06:30:00",
+    "activityType": {"typeId": 1, "typeKey": "running"},
+    "duration": 1820.0,
+    "distance": 5120.0,
+    "elevationGain": 0,
+    "averageHR": 149.0,
+    "maxHR": 165.0,
+    "calories": 401.0
+  }
+]

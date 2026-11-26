@@ -1,0 +1,8 @@
+[
+  {
+    "userId": 1000001,
+    "generic": {"calendarDate": "2025-01-15", "vo2MaxPreciseValue": 51.3, "vo2MaxValue": 51.0},
+    "cycling": {"calendarDate": "2025-01-15", "vo2MaxPreciseValue": 54.6, "vo2MaxValue": 55.0},
+    "heatAltitudeAcclimation": null
+  }
+]
