@@ -60,6 +60,10 @@ function dialog(title, body, { submit = "Save", danger = null } = {}) {
   });
 }
 
+async function confirmDialog(title, text, action) {
+  return (await dialog(title, `<p>${esc(text)}</p>`, { submit: action })) !== null;
+}
+
 // --- data -------------------------------------------------------------------------------
 
 async function daily(keys, from, to) {
@@ -546,12 +550,12 @@ async function viewSettings() {
         ${t.revoked ? "" : `<button class="btn small danger" data-revoke="${t.id}">Revoke</button>`}</div>`).join("") || `<p class="muted small">No tokens.</p>`}</div>
       <button class="btn" data-newtoken ${demo ? "disabled" : ""}>New token</button></section>
     <section class="card" style="margin-top:12px"><h3>Export</h3>
-      <p class="muted small">${demo ? "Exports need the real server; in the demo you can print the current view." : "All your data as CSV, or this week's report as PDF. Weekly PDFs are also written automatically on Sundays."}</p>
+      <p class="muted small">${demo ? "Exports (CSV, weekly PDF) need the real server." : "All your data as CSV, or this week's report as PDF. Weekly PDFs are also written automatically on Sundays."}</p>
       <div class="toolbar">
         ${demo ? "" : `<a class="btn" href="api/v1/export/all.zip">All data (ZIP of CSVs)</a>
         ${["metrics", "activities", "events", "ratings"].map((d) => `<a class="btn small" href="api/v1/export/${d}.csv">${d}.csv</a>`).join("")}
         <a class="btn" href="api/v1/reports/weekly.pdf" target="_blank" rel="noopener">This week (PDF)</a>`}
-        <button class="btn" data-print>Print / save view as PDF</button>
+        ${window.PULSE_CONFIG?.embedded ? "" : `<button class="btn" data-print>Print / save view as PDF</button>`}
       </div></section>
     <section class="card" style="margin-top:12px"><h3>Session</h3>
       <div class="toolbar">${demo ? `<button class="btn" data-reset>Reset demo data</button>` : `<button class="btn" data-logout>Log out</button>`}
@@ -561,7 +565,9 @@ async function viewSettings() {
   $$("[data-scale]", view).forEach((b) => (b.onclick = () => scaleDialog(scales.find((s) => s.id === Number(b.dataset.scale)))));
   $("[data-newscale]", view).onclick = () => scaleDialog();
   $$("[data-revoke]", view).forEach((b) => (b.onclick = () => guard(async () => {
-    if (confirm("Revoke this token? The device will lose access.")) { await api.revokeToken(Number(b.dataset.revoke)); route(); }
+    if (await confirmDialog("Revoke this token?", "The device loses access immediately.", "Revoke")) {
+      await api.revokeToken(Number(b.dataset.revoke)); route();
+    }
   })));
   $("[data-newtoken]", view).onclick = () => guard(async () => {
     const fd = await dialog("New device token", `<label class="field"><span>Device name</span><input type="text" name="name" required placeholder="Pixel phone"></label>`, { submit: "Create" });
@@ -570,7 +576,8 @@ async function viewSettings() {
     await dialog("Token created", `<p>Copy it now. It won't be shown again.</p><input type="text" readonly value="${esc(t.token)}" onclick="this.select()">`, { submit: null });
     route();
   });
-  $("[data-print]", view).onclick = () => { location.hash = "#trends"; setTimeout(() => window.print(), 1200); };
+  const printBtn = $("[data-print]", view);
+  if (printBtn) printBtn.onclick = () => { location.hash = "#trends"; setTimeout(() => window.print(), 1200); };
   $("[data-logout]", view)?.addEventListener("click", () => guard(async () => { await api.logout(); renderLogin(); }));
   $("[data-reset]", view)?.addEventListener("click", () => { api.reset(); location.reload(); });
 }
@@ -614,7 +621,7 @@ async function eventDialog(e) {
   if (!fd) return;
   await guard(async () => {
     if (fd === "danger") {
-      if (!confirm(`Delete "${e.title}"?`)) return;
+      if (!(await confirmDialog("Delete this event?", `"${e.title}" will be removed from all charts.`, "Delete"))) return;
       await api.deleteEvent(e.id); toast("Event deleted."); route(); return;
     }
     const body = {
@@ -679,7 +686,7 @@ async function scaleDialog(s = {}) {
 async function ratingDialog() {
   const scales = await guard(() => api.scales());
   if (!scales) return;
-  if (!scales.length) { toast("Create a scale in Settings first."); location.hash = "#settings"; return; }
+  if (!scales.length) { toast("Create a scale in Settings first."); location.hash = "#setup"; return; }
   const fd = await dialog("How are you?", `
     ${scales.map((s) => {
       const mid = Math.round(((s.min_value + s.max_value) / 2) / s.step) * s.step;
@@ -735,7 +742,7 @@ function renderLogin() {
 }
 
 const VIEWS = { today: viewToday, trends: viewTrends, longterm: viewLongterm, activities: viewActivities,
-  wellbeing: viewWellbeing, events: viewEvents, settings: viewSettings };
+  wellbeing: viewWellbeing, events: viewEvents, setup: viewSettings };
 
 async function route() {
   const name = (location.hash || "#today").slice(1);
