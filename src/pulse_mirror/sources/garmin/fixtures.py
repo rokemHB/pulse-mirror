@@ -44,6 +44,13 @@ _ID_KEYS = {
     "applicationkey",
 }
 _DROP_KEYS_CONTAINING = (
+    # absolute heights hint at where someone lives; climbs (elevationGain/Loss) are kept
+    "minelevation",
+    "maxelevation",
+    "avgelevation",
+    "environmentaltitude",
+    "currentaltitude",
+    "previousaltitude",
     "latitude",
     "longitude",
     "polyline",
