@@ -85,7 +85,7 @@
   "latestSpo2": null,
   "latestSpo2ReadingTimeGmt": null,
   "latestSpo2ReadingTimeLocal": null,
-  "averageMonitoringEnvironmentAltitude": 12.32,
+  "averageMonitoringEnvironmentAltitude": null,
   "restingCaloriesFromActivity": null,
   "bodyBatteryDynamicFeedbackEvent": {
     "eventTimestampGmt": "2025-01-15T21:25:54",

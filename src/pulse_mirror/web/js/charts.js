@@ -24,8 +24,20 @@ export const isoDay = (t) => {
 const fmtDay = (t) => new Date(t).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 
 const charts = new Set();
-window.addEventListener("resize", () => charts.forEach((c) => c.resize()));
-export function disposeAll() { charts.forEach((c) => c.dispose()); charts.clear(); }
+// Each chart follows its own container: charts created while the grid layout is still
+// settling would otherwise keep a stale width and draw past their card.
+const observer = new ResizeObserver((entries) => {
+  for (const e of entries) echarts.getInstanceByDom(e.target)?.resize();
+});
+function track(el, chart) {
+  charts.add(chart);
+  observer.observe(el);
+  requestAnimationFrame(() => chart.resize());
+}
+export function disposeAll() {
+  charts.forEach((c) => { observer.unobserve(c.getDom()); c.dispose(); });
+  charts.clear();
+}
 
 /**
  * @param el container
@@ -34,7 +46,7 @@ export function disposeAll() { charts.forEach((c) => c.dispose()); charts.clear(
  */
 export function timeChart(el, opts) {
   const chart = echarts.init(el, null, { renderer: "canvas" });
-  charts.add(chart);
+  track(el, chart);
   const text2 = css("--text-secondary"), grid = css("--grid"), surface = css("--surface-1");
   const format = opts.format || ((v) => (Math.round(v * 10) / 10).toLocaleString());
   const catById = new Map((opts.categories || []).map((c) => [c.id, c]));
@@ -154,7 +166,7 @@ export function timeChart(el, opts) {
 /** Simple monthly/weekly bar chart for category axes (e.g. training volume). */
 export function barChart(el, { labels, values, slot, unit, format }) {
   const chart = echarts.init(el);
-  charts.add(chart);
+  track(el, chart);
   const text2 = css("--text-secondary"), grid = css("--grid");
   const f = format || ((v) => (Math.round(v * 10) / 10).toLocaleString());
   chart.setOption({
