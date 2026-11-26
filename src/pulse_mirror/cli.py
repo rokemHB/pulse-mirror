@@ -130,7 +130,7 @@ def cmd_backfill_garmin(settings: Settings, args: argparse.Namespace) -> int:
         stop_before=date.fromisoformat(args.since) if args.since else None,
         max_days=args.max_days,
         empty_stop=args.empty_stop,
-        progress=print,
+        progress=lambda msg: print(msg, flush=True),
     )
     return 0 if result.status in ("done", "paused") and "429" not in result.message else 1
 

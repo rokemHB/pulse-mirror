@@ -79,14 +79,17 @@ class StaticApi {
 
   async file(name) {
     if (!this.cache[name]) {
-      const saved = localStorage.getItem(STORE + name);
+      let saved = null;
+      try { saved = localStorage.getItem(STORE + name); } catch { /* storage blocked: start fresh */ }
       this.cache[name] = saved ? JSON.parse(saved)
         : await fetch(this.base + name + ".json").then((r) => r.json());
     }
     return this.cache[name];
   }
-  save(name) { localStorage.setItem(STORE + name, JSON.stringify(this.cache[name])); }
-  reset() { Object.keys(localStorage).filter((k) => k.startsWith(STORE)).forEach((k) => localStorage.removeItem(k)); }
+  save(name) { try { localStorage.setItem(STORE + name, JSON.stringify(this.cache[name])); } catch { /* keep in memory */ } }
+  reset() {
+    try { Object.keys(localStorage).filter((k) => k.startsWith(STORE)).forEach((k) => localStorage.removeItem(k)); } catch { /* nothing stored */ }
+  }
 
   async login() { return { kind: "session" }; }
   async logout() {}
